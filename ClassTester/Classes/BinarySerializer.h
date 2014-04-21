@@ -39,17 +39,28 @@ typedef enum {
 // Serializing
 - (BOOL) startSerializing;
 - (BOOL) startSerializingWithByteCount:(int) count;
-- (BOOL) addData:(uint32)data maxValue:(uint32)maxValue;
-- (BOOL) addData:(uint32) data bits:(uint32) bits;
+
+- (BOOL) addSignedData:(sint32)value maxValue:(uint32)maxValue;
+- (BOOL) addSignedData:(sint32) value bits:(uint32) bits;
+
+- (BOOL) addUnsignedData:(uint32)data maxValue:(uint32)maxValue;
+- (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
+
+- (BOOL) addOnes:(int) amount;
+- (BOOL) addZeros:(int) amount;
+
 - (SerializedData*) finalizeSerializing;
 
 // Deserializing
 - (BOOL) startDeserializingWith:(SerializedData*) data;
-- (uint32) getDataMaxValue:(uint32)maxValue;
-- (uint32) getDataBits:(uint32) bits;
 
-- (BOOL) addOnes:(int) amount;
-- (BOOL) addZeros:(int) amount;
+- (uint32) getUnsignedDataMaxValue:(uint32)maxValue;
+- (uint32) getUnsignedDataBits:(uint32) bits;
+
+- (sint32) getSignedDataMaxValue:(uint32)maxValue;
+- (sint32) getSignedDataBits:(uint32) bits;
+
+
 
 - (SerializedData*) getData;
 

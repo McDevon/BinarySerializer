@@ -36,7 +36,7 @@
 - (void) testExpanding
 {
     [_serializer startSerializingWithByteCount:1];
-    [_serializer addData:10 bits:25];
+    [_serializer addUnsignedData:10 bits:25];
     SerializedData *data = [_serializer finalizeSerializing];
     
     if (data.count != 4) {
@@ -49,15 +49,15 @@
     // Create data
     
     [_serializer startSerializingWithByteCount:1];
-    [_serializer addData:10 bits:25];
+    [_serializer addUnsignedData:10 bits:25];
     [_serializer addOnes:15];
-    [_serializer addData:424736893 maxValue:500000000];
+    [_serializer addUnsignedData:424736893 maxValue:500000000];
     
     uint32 dataLength = 14;
-    [_serializer addData:dataLength maxValue:31];
-    [_serializer addData:8657 bits:dataLength + 1];
-    [_serializer addData:31 maxValue:5000];
-    [_serializer addData:10 maxValue:10];
+    [_serializer addUnsignedData:dataLength maxValue:31];
+    [_serializer addUnsignedData:8657 bits:dataLength + 1];
+    [_serializer addUnsignedData:31 maxValue:5000];
+    [_serializer addUnsignedData:10 maxValue:10];
     [_serializer addZeros:4];
     SerializedData *data = [_serializer finalizeSerializing];
 
@@ -69,41 +69,102 @@
         XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    uint32 d01 = [_serializer getDataBits:25];
+    uint32 d01 = [_serializer getUnsignedDataBits:25];
     if (d01 != 10) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
     // Skip ones
-    [_serializer getDataBits:15];
+    [_serializer getUnsignedDataBits:15];
     
-    d01 = [_serializer getDataMaxValue:500000000];
+    d01 = [_serializer getUnsignedDataMaxValue:500000000];
     if (d01 != 424736893) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    uint32 readLength = [_serializer getDataMaxValue:31];
+    uint32 readLength = [_serializer getUnsignedDataMaxValue:31];
     if (readLength != 14) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    d01 = [_serializer getDataBits:readLength + 1];
+    d01 = [_serializer getUnsignedDataBits:readLength + 1];
     if (d01 != 8657) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    d01 = [_serializer getDataMaxValue:5000];
+    d01 = [_serializer getUnsignedDataMaxValue:5000];
     if (d01 != 31) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
 
-    d01 = [_serializer getDataMaxValue:10];
+    d01 = [_serializer getUnsignedDataMaxValue:10];
     if (d01 != 10) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
     // Get final zeros (Must finish the last byte)
-    [_serializer getDataBits:5];
+    [_serializer getUnsignedDataBits:5];
+    
+    // Test if done deserializing
+    if (_serializer.state != ss_doneDeserializing) {
+        XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
+    }
+}
+
+- (void) testSignedData
+{
+    // Create data
+    [_serializer startSerializingWithByteCount:3];
+    
+    [_serializer addOnes:3];
+    [_serializer addSignedData:34 bits:7];
+    [_serializer addSignedData:350 maxValue:500];
+    [_serializer addOnes:3];
+    [_serializer addSignedData:-845372 maxValue:900000];
+    [_serializer addSignedData:-56 bits:32];
+    [_serializer addSignedData:-789432519 bits:32];
+    [_serializer addOnes:4];
+    
+    SerializedData *data = [_serializer finalizeSerializing];
+    
+    // Read data
+    if (!!![_serializer startDeserializingWith:data]) {
+        XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip ones
+    [_serializer getUnsignedDataBits:3];
+    
+    sint32 d01 = [_serializer getSignedDataBits:7];
+    if (d01 != 34) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    d01 = [_serializer getSignedDataMaxValue:500];
+    if (d01 != 350) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip ones
+    [_serializer getUnsignedDataBits:3];
+    
+    d01 = [_serializer getSignedDataMaxValue:900000];
+    if (d01 != -845372) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    d01 = [_serializer getSignedDataBits:32];
+    if (d01 != -56) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    d01 = [_serializer getSignedDataBits:32];
+    if (d01 != -789432519) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip ones
+    [_serializer getUnsignedDataBits:4];
     
     // Test if done deserializing
     if (_serializer.state != ss_doneDeserializing) {

@@ -90,7 +90,7 @@
     }
     
     // Copy old data
-    for (uint32 i = 0; i < _count; i++) {
+    for (uint32 i = 0; i < newSize; i++) {
         newData[i] = _data[i];
     }
     
@@ -117,6 +117,27 @@
     
     SerializingState _state;
 }
+
+#pragma mark -
+#pragma mark Helper methods
+#pragma mark -
+
+- (uint32) getMaxBitsForValue:(uint32)maxValue
+{
+    uint32 bits = 0;
+    for (uint32 i = 0; i < 32; i++) {
+        if (pow(2, i) - 1 > maxValue) {
+            bits = i;
+            break;
+        }
+    }
+    
+    return bits;
+}
+
+#pragma mark -
+#pragma mark Serializing
+#pragma mark -
 
 - (BOOL) startSerializing
 {
@@ -145,19 +166,64 @@
     return YES;
 }
 
-- (BOOL) addData:(uint32)data maxValue:(uint32)maxValue
+- (BOOL) addUnsignedData:(uint32)value maxValue:(uint32)maxValue
 {
-    uint32 bits = 0;
-    for (uint32 i = 0; i < 32; i++) {
-        if (pow(2, i) - 1 > maxValue) {
-            bits = i;
-            break;
-        }
-    }
+    uint32 bits = [self getMaxBitsForValue:maxValue];
+    
     if (bits == 0) {
         return NO;
     }
-    return [self addData:data bits:bits];
+    
+    // Sanity check
+    uint32 edgeValue = bits >= 32 ? 0xffffffff : pow(2, bits) - 1;
+    if (value > edgeValue)
+    {
+        // Trying to set a value which does not fit in the given amount of bits
+        return NO;
+    }
+    
+    return [self addData:value bits:bits];
+}
+
+- (BOOL) addUnsignedData:(uint32) value bits:(uint32) bits
+{
+    // Sanity check
+    uint32 edgeValue = bits >= 32 ? 0xffffffff : pow(2, bits) - 1;
+    if (value > edgeValue)
+    {
+        // Trying to set a value which does not fit in the given amount of bits
+        return NO;
+    }
+    
+    return [self addData:value bits:bits];
+}
+
+- (BOOL) addSignedData:(sint32)value maxValue:(uint32)maxValue
+{
+    uint32 bits = [self getMaxBitsForValue:maxValue] + 1;
+    
+    if (bits == 0) {
+        return NO;
+    }
+    
+    // Sanity check
+    sint32 edgeValue = bits >= 32 ? 0x7fffffff : pow(2, bits - 1) - 1;
+    if (value >= edgeValue || value < -edgeValue) {
+        return NO;
+    }
+
+    return [self addSignedData:(uint32)value bits:bits];
+}
+
+- (BOOL) addSignedData:(sint32) value bits:(uint32) bits
+{
+    // Sanity check
+    sint32 edgeValue = bits >= 32 ? 0x7fffffff : pow(2, bits - 1) - 1;
+    if (value >= edgeValue || value < -edgeValue) {
+        return NO;
+    }
+    
+    return [self addData:value bits:bits];
 }
 
 - (BOOL) addData:(uint32) value bits:(uint32) bits
@@ -166,12 +232,6 @@
         return NO;
     }
     
-    // Sanity check
-    if (value > pow(2, bits))
-    {
-        // Trying to set a value which does not fit in the given amount of bits
-        return NO;
-    }
     while (bits + _bitIndex > 8 * _data.count)
     {
         // Bit index goes beyond message boundaries
@@ -201,8 +261,20 @@
         // Get start bit
         startBit = _bitIndex % 8;
         
+        
+        // Trim to how many bits
+        uint8 trim = bits + startBit >= 8 ? 0 : bits;
+        
+        uint8 byte = ((uint8)value);
+        
+        // Trim
+        if (trim > 0) {
+            byte = byte & (uint8)(pow(2, trim) - 1);
+        }
+        
         // Set bits
-        _data.data[i] = (uint8)(_data.data[i] | ((uint8)value << startBit));
+        uint8 tempValue = (uint8)(_data.data[i] | (byte << startBit));
+        _data.data[i] = tempValue;
         
         // Change counters
         int bitsAdded = MIN(bits, 8 - startBit);
@@ -226,6 +298,11 @@
     return _data;
 }
 
+
+#pragma mark -
+#pragma mark Deserializing
+#pragma mark -
+
 - (BOOL) startDeserializingWith:(SerializedData*) data
 {
     if (_state == ss_error || _state == ss_serializing || _state == ss_deserializing
@@ -241,20 +318,59 @@
     return YES;
 }
 
-- (uint32) getDataMaxValue:(uint32)maxValue
+/*
+ *  Unsigned getters
+ */
+
+- (uint32) getUnsignedDataMaxValue:(uint32)maxValue
 {
-    uint32 bits = 0;
-    for (uint32 i = 0; i < 32; i++) {
-        if (pow(2, i) - 1 > maxValue) {
-            bits = i;
-            break;
-        }
-    }
+    uint32 bits = [self getMaxBitsForValue:maxValue];
+    
     if (bits == 0) {
         return 0;
     }
+    
     return [self getDataBits:bits];
 }
+
+- (uint32) getUnsignedDataBits:(uint32) bits
+{
+    return [self getDataBits:bits];
+}
+
+/*
+ *  Signed getters
+ */
+
+- (sint32) getSignedDataMaxValue:(uint32)maxValue
+{
+    uint32 bits = [self getMaxBitsForValue:maxValue] + 1;
+    
+    if (bits == 0) {
+        return 0;
+    }
+    
+    return [self getSignedDataBits:bits];
+}
+
+
+- (sint32) getSignedDataBits:(uint32) bits
+{
+    uint32 value = [self getDataBits:bits];
+    
+    // If negative (test most significant bit)
+    if ((value & (uint32)pow(2, bits - 1)) > 0) {
+        uint32 mask = (uint32)0xffffffff - (uint32)(pow(2, bits) - 1);
+        return (sint32)(mask | value);
+    }
+    
+    // Positive
+    return value;
+}
+
+/*
+ *  Actual getter method
+ */
 
 - (uint32) getDataBits:(uint32) bits
 {
@@ -308,7 +424,7 @@
     // End deserializing when reached the end of data
     if (_bitIndex == 8 * _data.count) {
         _state = ss_doneDeserializing;
-        NSLog(@"Done deserializing");
+        //NSLog(@"Done deserializing");
     }
     
     return value;

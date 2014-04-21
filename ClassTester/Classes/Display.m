@@ -22,11 +22,13 @@
     BinarySerializer *serializer = [[BinarySerializer alloc] init];
     
     [serializer startSerializingWithByteCount:5];
-    [serializer addData:1549 maxValue:2500];
-    [serializer addData:543765 maxValue:600000];
-    [serializer addOnes:10];
-    [serializer addZeros:5];
-    [serializer addOnes:31];
+    //[serializer addData:1549 maxValue:2500];
+    //[serializer addData:543765 maxValue:600000];
+    sint32 value = -43765;
+    [serializer addSignedData:value maxValue:600000];
+    //[serializer addOnes:10];
+    //[serializer addZeros:5];
+    //[serializer addOnes:31];
     
     //SerializedData *data = [serializer getData];
     SerializedData *data = [serializer finalizeSerializing];
@@ -34,12 +36,16 @@
     [self writeLine:[data bitString]];
     
     [serializer startDeserializingWith:data];
-    uint32 firstVal = [serializer getDataMaxValue:2500];
-    uint32 secondVal = [serializer getDataMaxValue:600000];
+    //uint32 firstVal = [serializer getDataMaxValue:2500];
+    //uint32 secondVal = [serializer getDataMaxValue:600000];
+    sint32 thirdVal = [serializer getSignedDataMaxValue:600000];
     
-    [self writeLine:[NSString stringWithFormat:@"Got data: %u %u", firstVal, secondVal]];
+    [self writeLine:[NSString stringWithFormat:@"Test data: %u %d", thirdVal, thirdVal]];
+
+    //[self writeLine:[NSString stringWithFormat:@"Got data: %u %u", firstVal, secondVal]];
     
     [self writeLine:[NSString stringWithFormat:@"%u", (uint8)(0xff - (pow(2, 7) - 1))]];
+    
     
 }
 
