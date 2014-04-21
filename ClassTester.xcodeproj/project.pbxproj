@@ -18,6 +18,8 @@
 		4C6455DD1902741600D9CC29 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C6455BC1902741600D9CC29 /* Cocoa.framework */; };
 		4C6455E51902741600D9CC29 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 4C6455E31902741600D9CC29 /* InfoPlist.strings */; };
 		4C6455E71902741600D9CC29 /* ClassTesterTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C6455E61902741600D9CC29 /* ClassTesterTests.m */; };
+		4C6455F21902791600D9CC29 /* BinarySerializer.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C6455F11902791600D9CC29 /* BinarySerializer.m */; };
+		4C6455F8190283FF00D9CC29 /* Display.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C6455F7190283FF00D9CC29 /* Display.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +52,10 @@
 		4C6455E21902741600D9CC29 /* ClassTesterTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "ClassTesterTests-Info.plist"; sourceTree = "<group>"; };
 		4C6455E41902741600D9CC29 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		4C6455E61902741600D9CC29 /* ClassTesterTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ClassTesterTests.m; sourceTree = "<group>"; };
+		4C6455F01902791600D9CC29 /* BinarySerializer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BinarySerializer.h; path = Classes/BinarySerializer.h; sourceTree = "<group>"; };
+		4C6455F11902791600D9CC29 /* BinarySerializer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = BinarySerializer.m; path = Classes/BinarySerializer.m; sourceTree = "<group>"; };
+		4C6455F6190283FF00D9CC29 /* Display.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Display.h; path = Classes/Display.h; sourceTree = "<group>"; };
+		4C6455F7190283FF00D9CC29 /* Display.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = Display.m; path = Classes/Display.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +123,10 @@
 			children = (
 				4C6455CE1902741600D9CC29 /* AppDelegate.h */,
 				4C6455CF1902741600D9CC29 /* AppDelegate.m */,
+				4C6455F01902791600D9CC29 /* BinarySerializer.h */,
+				4C6455F11902791600D9CC29 /* BinarySerializer.m */,
+				4C6455F6190283FF00D9CC29 /* Display.h */,
+				4C6455F7190283FF00D9CC29 /* Display.m */,
 				4C6455D11902741600D9CC29 /* MainMenu.xib */,
 				4C6455D41902741600D9CC29 /* Images.xcassets */,
 				4C6455C31902741600D9CC29 /* Supporting Files */,
@@ -253,6 +263,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C6455D01902741600D9CC29 /* AppDelegate.m in Sources */,
+				4C6455F21902791600D9CC29 /* BinarySerializer.m in Sources */,
+				4C6455F8190283FF00D9CC29 /* Display.m in Sources */,
 				4C6455C91902741600D9CC29 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
