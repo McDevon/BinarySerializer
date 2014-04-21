@@ -275,7 +275,7 @@
     
     // Get required byte amount
     int startBit = _bitIndex % 8;
-    int trim = bits > 8 ? 0 : 8 - bits;
+    int trim;
     int targetBit = 0;
     int byteAmount = (bits + startBit) / 8 + 1;
     
