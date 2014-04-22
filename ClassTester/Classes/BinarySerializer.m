@@ -27,7 +27,7 @@
 
 - (BOOL) mallocDataBytes:(uint32) count
 {
-    _data = malloc(sizeof(uint8) * count);
+    _data = (uint8*)calloc(count, sizeof(uint8));
     
     // Test if allocation failed
     if (_data == NULL) {
@@ -83,14 +83,14 @@
 
 - (BOOL) resizeTo:(uint32) newSize
 {
-    uint8 *newData = malloc(sizeof(uint8) * newSize);
+    uint8 *newData = (uint8*)calloc(newSize, sizeof(uint8));
     // Test if allocation failed
     if (newData == NULL) {
         return NO;
     }
     
     // Copy old data
-    for (uint32 i = 0; i < newSize; i++) {
+    for (uint32 i = 0; i < newSize && i < _count; i++) {
         newData[i] = _data[i];
     }
     
@@ -166,6 +166,10 @@
     return YES;
 }
 
+/*
+ *  Writing unsigned data
+ */
+
 - (BOOL) addUnsignedData:(uint32)value maxValue:(uint32)maxValue
 {
     uint32 bits = [self getMaxBitsForValue:maxValue];
@@ -198,6 +202,10 @@
     return [self addData:value bits:bits];
 }
 
+/*
+ *  Writing signed data
+ */
+
 - (BOOL) addSignedData:(sint32)value maxValue:(uint32)maxValue
 {
     uint32 bits = [self getMaxBitsForValue:maxValue] + 1;
@@ -225,6 +233,31 @@
     
     return [self addData:value bits:bits];
 }
+
+/*
+ *  Writing string data
+ */
+
+- (BOOL) addStringInASCII:(NSString*) string
+{
+    // Convert to chars
+    const char *data = [[[NSString stringWithFormat:@"%@\0", string] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes];
+    
+    // Add to data
+    size_t i = 0;
+    while (i <= 0 || data[i-1] != '\0') {
+        [self addData:(uint32)data[i] bits:8];
+        i++;
+    }
+    
+    //printf("%s", data);
+    
+    return NO;
+}
+
+/*
+ *  Actual data adding method
+ */
 
 - (BOOL) addData:(uint32) value bits:(uint32) bits
 {
@@ -366,6 +399,58 @@
     
     // Positive
     return value;
+}
+
+/*
+ *  String getters
+ */
+
+- (NSString*) getStringInASCII
+{
+    // Start getting some
+    size_t t = 32;
+    size_t i = 0;
+    char *string = (char*)calloc(t, sizeof(char));
+    if (string == NULL) {
+        _state = ss_error;
+        return nil;
+    }
+    do {
+        string[i] = (char)[self getDataBits:8];
+        if (_state == ss_error) {
+            return nil;
+        }
+        i++;
+        
+        // If string gets too short, double its size
+        if (i >= t) {
+            t *= 2;
+            // Allocate new string
+            char *newString = (char*)calloc(t, sizeof(char));
+            
+            if (newString == NULL) {
+                free(string);
+                _state = ss_error;
+                return nil;
+            }
+            
+            // Copy old data
+            for (int j = 0; j < i; j++) {
+                newString[j] = string[j];
+            }
+
+            free(string);
+            string = NULL;
+            string = newString;
+        }
+    } while (string[i-1] != '\0');
+    
+    NSString *str = [[NSString alloc] initWithBytes:string length:i - 1 encoding:NSASCIIStringEncoding];
+    
+    free(string);
+    string = NULL;
+    
+    return str;
 }
 
 /*

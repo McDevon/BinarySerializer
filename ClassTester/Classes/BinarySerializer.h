@@ -46,6 +46,8 @@ typedef enum {
 - (BOOL) addUnsignedData:(uint32)data maxValue:(uint32)maxValue;
 - (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
 
+- (BOOL) addStringInASCII:(NSString*) string;
+
 - (BOOL) addOnes:(int) amount;
 - (BOOL) addZeros:(int) amount;
 
@@ -60,6 +62,7 @@ typedef enum {
 - (sint32) getSignedDataMaxValue:(uint32)maxValue;
 - (sint32) getSignedDataBits:(uint32) bits;
 
+- (NSString*) getStringInASCII;
 
 
 - (SerializedData*) getData;
