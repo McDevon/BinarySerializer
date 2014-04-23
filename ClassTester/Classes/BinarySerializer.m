@@ -9,6 +9,12 @@
 //#import <objc/runtime.h>
 #import "BinarySerializer.h"
 
+// These values will define the bit size of variables to store the values in serialized data
+#define MAX_OBJECTS_IN_NSARRAY          1023
+#define MAX_OBJECTS_IN_NSDICTIONARY     1023
+#define MAX_OBJECTS_IN_NSSET            1023
+#define MAX_LENGTH_OF_NSSTRING          32767   // 2^15 - 1
+
 /*
  *  Helper functions for string compression
  */
@@ -143,6 +149,7 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (NSString*) bitString
 {
+    // Create a string showing all the bits of the data byte by byte
     NSMutableString *bitString = [[NSMutableString alloc] init];
     
     for (int i = 0; i < _count; i++)
@@ -218,6 +225,16 @@ char charFromMinimalChar(uint8 shortChar)
     uint32 _bitIndex;
     
     SerializingState _state;
+    BOOL _compressAllStrings;
+}
+
+- (id) init
+{
+    if (self = [super init]) {
+        _compressAllStrings = NO;
+    }
+    
+    return self;
 }
 
 #pragma mark -
@@ -226,9 +243,10 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (uint32) getMaxBitsForValue:(uint32)maxValue
 {
+    // Get the minimum amount of bits required to store the given value
     uint32 bits = 0;
     for (uint32 i = 0; i < 32; i++) {
-        if (pow(2, i) - 1 > maxValue) {
+        if (pow(2, i) > maxValue) {
             bits = i;
             break;
         }
@@ -315,12 +333,6 @@ char charFromMinimalChar(uint8 shortChar)
     if (bits == 0) {
         return NO;
     }
-    
-    // Sanity check
-    sint32 edgeValue = bits >= 32 ? 0x7fffffff : pow(2, bits - 1) - 1;
-    if (value >= edgeValue || value < -edgeValue) {
-        return NO;
-    }
 
     return [self addSignedData:(uint32)value bits:bits];
 }
@@ -334,6 +346,28 @@ char charFromMinimalChar(uint8 shortChar)
     }
     
     return [self addData:value bits:bits];
+}
+
+/*
+ *  Special helpers (for e.g. booleans)
+ */
+
+- (BOOL) addBoolean:(BOOL)value
+{
+    uint32 boolean = value ? 1 : 0;
+    return [self addData:boolean bits:1];
+}
+
+- (BOOL) addOnes:(int) amount
+{
+    int value = (int)(pow(2, amount) - 1);
+    return [self addData:value bits:amount];
+}
+
+- (BOOL) addZeros:(int) amount
+{
+    int value = 0;
+    return [self addData:value bits:amount];
 }
 
 /*
@@ -412,28 +446,136 @@ char charFromMinimalChar(uint8 shortChar)
     return YES;
 }
 
-- (BOOL) addOnes:(int) amount
-{
-    int value = (int)(pow(2, amount) - 1);
-    return [self addData:value bits:amount];
-}
+/*
+ *  Handling of objects
+ */
 
-- (BOOL) addZeros:(int) amount
+- (BOOL) addObject:(NSObject*)object
 {
-    int value = 0;
-    return [self addData:value bits:amount];
-}
-
-- (BOOL) addObject:(NSObject<BinarySerializing> *)object
-{
+    // Sanity check
+    if (object == nil) {
+        return NO;
+    }
+    
     //const char* className = class_getName([object class]);
     NSString *className = NSStringFromClass([object class]);
     
     // First encode class name in compressed chars
     [self addCompressedString:className];
     
-    // Then, add the classes own data
-    return [object serializeWithSerializer:self];
+    // Then act according to object type
+    if ([[object class] conformsToProtocol:@protocol(BinarySerializing)]) {
+        
+        // Easy case, conforms to the defined protocol
+        NSObject <BinarySerializing> *o = (NSObject<BinarySerializing>*)object;
+        
+        // Add the data the class wants to add
+        return [o serializeWithSerializer:self];
+    }
+    
+    /*
+     *  Convenience handling of some of the Cocoa classes so no subclassing is required
+     */
+    
+    else if ([object isKindOfClass:[NSArray class]]) {
+        NSArray *array = (NSArray*) object;
+        
+        // Encode amount of objects
+        [self addUnsignedData:(uint32)array.count maxValue:MAX_OBJECTS_IN_NSARRAY];
+        
+        // Encode objects
+        for (NSObject *o in array) {
+            [self addObject:o];
+        }
+        
+        if (_state == ss_serializing) {
+            return YES;
+        }
+    }
+    
+    else if ([object isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dictionary = (NSDictionary*) object;
+        
+        // Encode amount of objects
+        [self addUnsignedData:(uint32)dictionary.count maxValue:MAX_OBJECTS_IN_NSDICTIONARY];
+        
+        // Encode objects and keys
+        NSArray *keys = [dictionary allKeys];
+        for (NSObject *key in keys) {
+            
+            // Key type
+            
+            // Special handling for NSStrings
+            if ([key isKindOfClass:[NSString class]]) {
+                // Add key type, then key in shortChar form
+                [self addCompressedString:@"MDSCString"];
+                
+                // Key
+                className = (NSString*) key;
+                [self addCompressedString:className];
+            }
+            else {
+                // If not NSString, add as object
+                [self addObject:key];
+            }
+            
+            // Key added, add data
+            [self addObject:[dictionary objectForKey:key]];
+        }
+        
+        // Added all objects, if everything is ok, we're done here
+        if (_state == ss_serializing) {
+            return YES;
+        }
+    }
+    
+    else if ([object isKindOfClass:[NSSet class]]) {
+        NSSet *set = (NSSet*) object;
+        
+        // Encode amount of objects
+        [self addUnsignedData:(uint32)set.count maxValue:MAX_OBJECTS_IN_NSSET];
+        
+        // Encode objects
+        for (NSObject *o in set) {
+            [self addObject:o];
+        }
+        
+        if (_state == ss_serializing) {
+            return YES;
+        }
+    }
+    
+    else if ([object isKindOfClass:[NSString class]]) {
+        NSString *string = (NSString*) object;
+        
+        // Compressed string
+        if (_compressAllStrings) {
+            
+            // Add compressed string data
+            [self addCompressedString:string];
+        }
+        else {
+            
+            // Add uncompressed string data byte by byte
+            const char *stringData = [string cStringUsingEncoding:NSUTF8StringEncoding];
+            
+            // Save string data
+            uint32 length = (uint32)string.length;
+            for (uint32 i = 0; i < length; i++) {
+                [self addData:stringData[i] bits:8];
+            }
+            
+            // Finalize the string
+            [self addData:'\0' bits:8];
+        }
+        
+        if (_state == ss_serializing) {
+            return YES;
+        }
+    }
+    
+    // Not possible to serialize this object or serialization failed
+    return NO;
 }
 
 /*
@@ -829,7 +971,21 @@ char charFromMinimalChar(uint8 shortChar)
     return str;
 }
 
-- (NSObject<BinarySerializing>*) getObject
+/*
+ *  Special handlers
+ */
+
+- (BOOL) getBoolean
+{
+    uint8 b = [self getDataBits:1];
+    return (b == 1);
+}
+
+/*
+ *  Object handling
+ */
+
+- (NSObject*) getObject
 {
     // First get class name, which is stored as a compressed string
     NSString *className = [self getCompressedString];
@@ -839,10 +995,173 @@ char charFromMinimalChar(uint8 shortChar)
         return nil;
     }
     
-    // Allocate the class from its name
-    NSObject<BinarySerializing>* object = [NSClassFromString(className) alloc];
+    return [self getObjectOfClassName:className];
+}
+
+- (NSObject*) getObjectOfClassName:(NSString*)className
+{
     
-    return [object initWithSerializer:self];
+    // Allocate the class from its name
+    NSObject *object = [NSClassFromString(className) alloc];
+    
+    if ([[object class] conformsToProtocol:@protocol(BinarySerializing)]) {
+        // Easy case: just use the method described in the protocol
+        NSObject<BinarySerializing> *o = (NSObject<BinarySerializing>*) object;
+        return [o initWithSerializer:self];
+    }
+    
+    /*
+     *  Convenience handling of some of the Cocoa classes so no subclassing is required
+     */
+
+    else if ([object isKindOfClass:[NSArray class]]) {
+        NSMutableArray *array = [NSMutableArray array];
+        
+        // Get length of array
+        uint32 length = [self getUnsignedDataMaxValue:MAX_OBJECTS_IN_NSARRAY];
+        
+        // Iterate to get the objects
+        for (uint32 i = 0; i < length; i++) {
+            NSObject *o = [self getObject];
+            if (o == nil) {
+                return nil;
+            }
+            [array addObject:o];
+        }
+        
+        // Got objects in array, return the stuff
+        NSArray *a = (NSArray*)object;
+        return [a initWithArray:array];
+    }
+    
+    else if ([object isKindOfClass:[NSDictionary class]]) {
+        NSMutableDictionary *dictionary = [NSMutableDictionary dictionary];
+        
+        // Get amount of items
+        uint32 length = [self getUnsignedDataMaxValue:MAX_OBJECTS_IN_NSDICTIONARY];
+        
+        // Iterate the objects and add to dictionary with keys
+        for (uint32 i = 0; i < length; i++) {
+            
+            // First, get key
+            
+            // Special handling for NSStrings (to use shortChars)
+            NSString *name = [self getCompressedString];
+            NSObject<NSCopying> *key = nil;
+            
+            if ([name isEqualToString:@"MDSCString"]) {
+                // Create a string from data
+                NSString *keyData = [self getCompressedString];
+                
+                // Initialize key
+                NSString *actualKey = [NSString alloc];
+                key = [actualKey initWithString:keyData];
+            }
+            // Other key objects are read as objects
+            else {
+                key = (NSObject<NSCopying>*)[self getObjectOfClassName:name];
+            }
+            
+            // Key is now found, next get the saved object
+            NSObject *o = [self getObject];
+            
+            if (key == nil || o == nil) {
+                return nil;
+            }
+            
+            // NOTE: NSCopying is not enforced in reading
+            
+            [dictionary setObject:o forKey:key];
+        }
+        
+        // Got objects in dictionary, create and return the final piece
+        NSDictionary *d = (NSDictionary*) object;
+        return [d initWithDictionary:dictionary];
+    }
+    
+    else if ([object isKindOfClass:[NSSet class]]) {
+        NSMutableSet *set = [NSMutableSet set];
+        
+        // Get length of array
+        uint32 length = [self getUnsignedDataMaxValue:MAX_OBJECTS_IN_NSSET];
+        
+        // Iterate to get the objects
+        for (uint32 i = 0; i < length; i++) {
+            NSObject *o = [self getObject];
+            if (o == nil) {
+                return nil;
+            }
+            [set addObject:o];
+        }
+        
+        // Got objects in array, return the stuff
+        NSSet *a = (NSSet*)object;
+        return [a initWithSet:set];
+    }
+    
+    else if ([object isKindOfClass:[NSString class]]) {
+        if (_compressAllStrings) {
+            // Read compressed string
+            // NOTE: will not return NSMutableStrings!
+            return [self getCompressedString];
+        }
+        else {
+            // Full string saved in UTF8
+            
+            // Start getting some
+            size_t t = 32;
+            size_t i = 0;
+            char *string = (char*)calloc(t, sizeof(char));
+            if (string == NULL) {
+                _state = ss_error;
+                return nil;
+            }
+            do {
+                string[i] = [self getDataBits:8];
+                
+                if (_state == ss_error) {
+                    free(string);
+                    return nil;
+                }
+                
+                i++;
+                
+                // If string gets too short, double its size
+                if (i >= t) {
+                    t *= 2;
+                    // Allocate new string
+                    char *newString = (char*)calloc(t, sizeof(char));
+                    
+                    if (newString == NULL) {
+                        free(string);
+                        _state = ss_error;
+                        return nil;
+                    }
+                    
+                    // Copy old data
+                    for (int j = 0; j < i; j++) {
+                        newString[j] = string[j];
+                    }
+                    
+                    free(string);
+                    string = NULL;
+                    string = newString;
+                }
+            } while (string[i-1] != '\0');
+
+            NSString *str = [[NSString alloc] initWithBytes:string length:i - 1 encoding:NSUTF8StringEncoding];
+            
+            free(string);
+            string = NULL;
+            
+            // NOTE: will not return NSMutableStrings!
+            return str;
+
+        }
+    }
+    
+    // This object type cannot be deserialized
+    return nil;
 }
 
 /*

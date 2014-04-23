@@ -46,6 +46,7 @@ typedef enum {
 @interface BinarySerializer : NSObject
 
 @property SerializingState state;
+@property BOOL compressAllStrings;
 
 // Serializing
 - (BOOL) startSerializing;
@@ -57,11 +58,26 @@ typedef enum {
 - (BOOL) addUnsignedData:(uint32)data maxValue:(uint32)maxValue;
 - (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
 
-- (BOOL) addObject:(NSObject<BinarySerializing>*) object;
+- (BOOL) addBoolean:(BOOL) value;
 
 - (BOOL) addASCIIString:(NSString*) string;
 - (BOOL) addCompressedString:(NSString*) string;
 - (BOOL) addMinimalString:(NSString*) string;
+
+/*
+ *  NOTE: addObject: will not handle properly following object types:
+ *  - Objects, which have non-ASCII characters in class name
+ *  - NSDictionaries with keys, which are NSStrings with non-ASCII characters
+ *
+ *  These non-ASCII characters will be converted to ASCII (lossy conversion)
+ *
+ *  Supported Cocoa object types:
+ *  - NSArray & NSMutableArray
+ *  - NSDictionary & NSMutableDictionary
+ *  - NSSet & NSMutableSet
+ *  - NSString (mutable not available)
+ */
+- (BOOL) addObject:(NSObject*) object;
 
 - (BOOL) addOnes:(int) amount;
 - (BOOL) addZeros:(int) amount;
@@ -81,11 +97,13 @@ typedef enum {
 - (sint32) getSignedDataMaxValue:(uint32)maxValue;
 - (sint32) getSignedDataBits:(uint32) bits;
 
+- (BOOL) getBoolean;
+
 - (NSString*) getASCIIString;
 - (NSString*) getCompressedString;
 - (NSString*) getMinimalString;
 
-- (NSObject<BinarySerializing>*) getObject;
+- (NSObject*) getObject;
 
 // Should use finalizeSerializing instead of this (it will trim the trailing bytes)
 - (SerializedData*) getData;
