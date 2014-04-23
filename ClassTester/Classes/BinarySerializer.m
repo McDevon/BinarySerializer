@@ -339,7 +339,7 @@ char charFromMinimalChar(uint8 shortChar)
  *  Writing string data
  */
 
-- (BOOL) addStringInASCII:(NSString*) string
+- (BOOL) addASCIIString:(NSString*) string
 {
     // Convert to chars
     const char *data = [[[NSString stringWithFormat:@"%@\0", string] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes];
@@ -409,6 +409,18 @@ char charFromMinimalChar(uint8 shortChar)
     }
     
     return YES;
+}
+
+- (BOOL) addOnes:(int) amount
+{
+    int value = (int)(pow(2, amount) - 1);
+    return [self addData:value bits:amount];
+}
+
+- (BOOL) addZeros:(int) amount
+{
+    int value = 0;
+    return [self addData:value bits:amount];
 }
 
 /*
@@ -520,6 +532,15 @@ char charFromMinimalChar(uint8 shortChar)
     return status;
 }
 
+- (SerializedData*) getData
+{
+    if (_state != ss_serializing) {
+        return NO;
+    }
+    
+    _state = ss_doneSerializing;
+    return _data;
+}
 
 #pragma mark -
 #pragma mark Deserializing
@@ -619,6 +640,7 @@ char charFromMinimalChar(uint8 shortChar)
     
     // If negative (test most significant bit)
     if ((value & (uint32)pow(2, bits - 1)) > 0) {
+        // Create two's complement in sint32 for the value
         uint32 mask = (uint32)0xffffffff - (uint32)(pow(2, bits) - 1);
         return (sint32)(mask | value);
     }
@@ -631,7 +653,7 @@ char charFromMinimalChar(uint8 shortChar)
  *  String getters
  */
 
-- (NSString*) getStringInASCII
+- (NSString*) getASCIIString
 {
     // Start getting some
     size_t t = 32;
@@ -858,23 +880,5 @@ char charFromMinimalChar(uint8 shortChar)
     return value;
 }
 
-- (BOOL) addOnes:(int) amount
-{
-    int value = (int)(pow(2, amount) - 1);
-    return [self addData:value bits:amount];
-}
-
-- (BOOL) addZeros:(int) amount
-{
-    int value = 0;
-    return [self addData:value bits:amount];
-}
-
-
-- (SerializedData*) getData
-{
-    _state = ss_doneSerializing;
-    return _data;
-}
 
 @end

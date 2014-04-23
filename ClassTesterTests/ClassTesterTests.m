@@ -177,12 +177,12 @@
     // Create data
     [_serializer startSerializingWithByteCount:3];
     
-    [_serializer addStringInASCII:@"Test string 1"];
+    [_serializer addASCIIString:@"Test string 1"];
     [_serializer addOnes:2];
-    [_serializer addStringInASCII:@"Test string 2"];
-    [_serializer addStringInASCII:@"Quite a bit longer string for testing purposes."];
+    [_serializer addASCIIString:@"Test string 2"];
+    [_serializer addASCIIString:@"Quite a bit longer string for testing purposes."];
     [_serializer addZeros:1];
-    [_serializer addStringInASCII:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters öäåÖÄÅû<Z;:_2"];
+    [_serializer addASCIIString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters öäåÖÄÅû<Z;:_2"];
     [_serializer addZeros:5];
     
     SerializedData *data = [_serializer finalizeSerializing];
@@ -192,7 +192,7 @@
         XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    NSString *s01 = [_serializer getStringInASCII];
+    NSString *s01 = [_serializer getASCIIString];
     if (!!![s01 isEqualToString:@"Test string 1"]) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
@@ -200,12 +200,12 @@
     // Skip ones
     [_serializer getUnsignedDataBits:2];
     
-    s01 = [_serializer getStringInASCII];
+    s01 = [_serializer getASCIIString];
     if (!!![s01 isEqualToString:@"Test string 2"]) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    s01 = [_serializer getStringInASCII];
+    s01 = [_serializer getASCIIString];
     if (!!![s01 isEqualToString:@"Quite a bit longer string for testing purposes."]) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
@@ -213,7 +213,7 @@
     // Skip zero
     [_serializer getUnsignedDataBits:1];
     
-    s01 = [_serializer getStringInASCII];
+    s01 = [_serializer getASCIIString];
     if (!!![s01 isEqualToString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters oaaOAAu<Z;:_2"]) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
