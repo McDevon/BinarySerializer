@@ -6,6 +6,7 @@
 //  Copyright (c) 2014 Jussi Enroos. All rights reserved.
 //
 
+//#import <objc/runtime.h>
 #import "BinarySerializer.h"
 
 /*
@@ -423,6 +424,18 @@ char charFromMinimalChar(uint8 shortChar)
     return [self addData:value bits:amount];
 }
 
+- (BOOL) addObject:(NSObject<BinarySerializing> *)object
+{
+    //const char* className = class_getName([object class]);
+    NSString *className = NSStringFromClass([object class]);
+    
+    // First encode class name in compressed chars
+    [self addCompressedString:className];
+    
+    // Then, add the classes own data
+    return [object serializeWithSerializer:self];
+}
+
 /*
  *  Actual data adding method
  */
@@ -816,6 +829,21 @@ char charFromMinimalChar(uint8 shortChar)
     return str;
 }
 
+- (NSObject<BinarySerializing>*) getObject
+{
+    // First get class name, which is stored as a compressed string
+    NSString *className = [self getCompressedString];
+    
+    if (className == nil) {
+        // State is already at error
+        return nil;
+    }
+    
+    // Allocate the class from its name
+    NSObject<BinarySerializing>* object = [NSClassFromString(className) alloc];
+    
+    return [object initWithSerializer:self];
+}
 
 /*
  *  Actual getter method

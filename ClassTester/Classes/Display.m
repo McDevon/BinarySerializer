@@ -9,6 +9,35 @@
 #import "Display.h"
 #import "BinarySerializer.h"
 
+@interface TestObject : NSObject <BinarySerializing>
+
+@property int testValue;
+
+@end
+
+@implementation TestObject
+{
+    int _testValue;
+}
+
+- (BOOL) serializeWithSerializer:(BinarySerializer *)serializer
+{
+    [serializer addSignedData:_testValue bits:10];
+    
+    return YES;
+}
+
+- (id) initWithSerializer:(BinarySerializer *)serializer
+{
+    if (self = [super init]) {
+        _testValue = [serializer getSignedDataBits:10];
+    }
+    
+    return self;
+}
+
+@end
+
 @interface Display ()
 
 @property (unsafe_unretained) IBOutlet NSTextView *textView;
@@ -23,21 +52,29 @@
         BinarySerializer *serializer = [[BinarySerializer alloc] init];
         
         [serializer startSerializingWithByteCount:5];
-        /*[serializer addUnsignedData:1549 maxValue:2500];
-         [serializer addUnsignedData:543765 maxValue:600000];
-         sint32 value = -43765;
-         [serializer addSignedData:value maxValue:600000];
-         [serializer addOnes:10];*/
+        
+        // 1. Add test string
         [serializer addCompressedString:@"This is ä test string öä and stuff yea"]; // ä and stuff"];
         
+        // 2. Add minimal test string of all characters
         for (int i = 0; i < 32; i++) {
             [serializer addUnsignedData:i bits:5];
         }
-        //[serializer addZeros:5];
-        //[serializer addOnes:31];
+        
+        // 3. Create and add two test objects
+        TestObject *t1 = [[TestObject alloc] init];
+        TestObject *t2 = [[TestObject alloc] init];
+       
+        t1.testValue = -426;
+        t2.testValue = 33;
+        
+        [serializer addObject:t1];
+        [serializer addObject:t2];
         
         //SerializedData *data = [serializer getData];
         //SerializedData *data = [serializer finalizeSerializing];
+        
+        // Serialize to a file
         NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         
         // Should find something
@@ -61,8 +98,12 @@
             NSLog(@"Did not write to file");
         }
         
-        //[self writeLine:[data bitString]];
         
+        /*
+         *  Read the data
+         */
+        
+        //[self writeLine:[data bitString]];
         //[serializer startDeserializingWith:data];
         
         done = [serializer startDeserializingWithFileURL:url error:&error];
@@ -75,28 +116,31 @@
             NSLog(@"Did not read from file");
         }
         
-        /*for (int i = 0; i < 32; i++) {
-         uint32 j = [serializer getUnsignedDataBits:5];
-         NSLog(@"data: %u", j);
-         }*/
-
-        /*uint32 firstVal = [serializer getUnsignedDataMaxValue:2500];
-         uint32 secondVal = [serializer getUnsignedDataMaxValue:600000];
-         sint32 thirdVal = [serializer getSignedDataMaxValue:600000];
-         [serializer getUnsignedDataBits:10];*/
-        
+        // 1. Get first string
         NSString *string = [serializer getCompressedString];
-        
         [self writeLine:[NSString stringWithFormat:@"Got String: %@", string]];
         
+        // 2. Get second string
         string = [serializer getMinimalString];
-        
         [self writeLine:[NSString stringWithFormat:@"Got String: %@", string]];
-        //[self writeLine:[NSString stringWithFormat:@"Test data: %u %d", thirdVal, thirdVal]];
+
+        // 3. Get test objects
+        /*TestObject *r1 = (TestObject*)[serializer getObject];
+        TestObject *r2 = (TestObject*)[serializer getObject];
         
-        //[self writeLine:[NSString stringWithFormat:@"Got data: %u %u", firstVal, secondVal]];
+        [self writeLine:[NSString stringWithFormat:@"Got t1 with data: %d", r1.testValue]];
+        [self writeLine:[NSString stringWithFormat:@"Got t2 with data: %d", r2.testValue]];*/
         
-        //[self writeLine:[NSString stringWithFormat:@"%u", (uint8)(0xff - (pow(2, 7) - 1))]];
+        // 3b. Get test object data
+        string = [serializer getCompressedString];
+        int value = [serializer getSignedDataBits:10];
+        
+        [self writeLine:[NSString stringWithFormat:@"Got %@ with data: %d", string, value]];
+        
+        string = [serializer getCompressedString];
+        value = [serializer getSignedDataBits:10];
+        
+        [self writeLine:[NSString stringWithFormat:@"Got %@ with data: %d", string, value]];
         
         /*if (i == 99) {
             [self writeLine:[data bitString]];

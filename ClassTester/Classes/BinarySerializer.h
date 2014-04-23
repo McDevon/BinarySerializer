@@ -17,6 +17,17 @@ typedef enum {
     ss_doneDeserializing,
 } SerializingState;
 
+@class BinarySerializer;
+
+@protocol BinarySerializing <NSObject>
+
+@required
+- (BOOL) serializeWithSerializer:(BinarySerializer*) serializer;
+- (id) initWithSerializer:(BinarySerializer*) serializer;
+
+@end
+
+
 
 @interface SerializedData : NSObject
 
@@ -46,6 +57,8 @@ typedef enum {
 - (BOOL) addUnsignedData:(uint32)data maxValue:(uint32)maxValue;
 - (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
 
+- (BOOL) addObject:(NSObject<BinarySerializing>*) object;
+
 - (BOOL) addASCIIString:(NSString*) string;
 - (BOOL) addCompressedString:(NSString*) string;
 - (BOOL) addMinimalString:(NSString*) string;
@@ -71,6 +84,8 @@ typedef enum {
 - (NSString*) getASCIIString;
 - (NSString*) getCompressedString;
 - (NSString*) getMinimalString;
+
+- (NSObject<BinarySerializing>*) getObject;
 
 // Should use finalizeSerializing instead of this (it will trim the trailing bytes)
 - (SerializedData*) getData;
