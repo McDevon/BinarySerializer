@@ -54,9 +54,13 @@ typedef enum {
 - (BOOL) addZeros:(int) amount;
 
 - (SerializedData*) finalizeSerializing;
+- (BOOL) finalizeSerializingToFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error;
+- (BOOL) finalizeSerializingToFilePath:(NSString*) path error:(NSError *__autoreleasing*) error;
 
 // Deserializing
 - (BOOL) startDeserializingWith:(SerializedData*) data;
+- (BOOL) startDeserializingWithFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error;
+- (BOOL) startDeserializingWithFilePath:(NSString*) path error:(NSError *__autoreleasing*) error;
 
 - (uint32) getUnsignedDataMaxValue:(uint32)maxValue;
 - (uint32) getUnsignedDataBits:(uint32) bits;

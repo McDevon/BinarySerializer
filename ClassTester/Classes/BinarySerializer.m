@@ -478,6 +478,10 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (SerializedData*) finalizeSerializing
 {
+    if (_state != ss_serializing) {
+        return NO;
+    }
+
     // Trim the bytes
     uint32 newSize = _bitIndex % 8 > 0 ? _bitIndex / 8 + 1 : _bitIndex / 8;
     [_data resizeTo:newSize];
@@ -485,6 +489,35 @@ char charFromMinimalChar(uint8 shortChar)
     _state = ss_doneSerializing;
     
     return _data;
+}
+
+- (BOOL) finalizeSerializingToFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error
+{
+    return [self finalizeSerializingToFilePath:[url path] error:error];
+}
+
+- (BOOL) finalizeSerializingToFilePath:(NSString*) path error:(NSError *__autoreleasing*) error
+{
+    if (_state != ss_serializing) {
+        return NO;
+    }
+
+    // Trim the bytes
+    uint32 newSize = _bitIndex % 8 > 0 ? _bitIndex / 8 + 1 : _bitIndex / 8;
+    [_data resizeTo:newSize];
+    
+    _state = ss_doneSerializing;
+    
+    // Save bytes to file
+    NSData *data = [NSData dataWithBytes:_data.data length:_data.count];
+    
+    BOOL status = [data writeToFile:path options:NSDataWritingAtomic error:error];
+    
+    /*if (error != nil) {
+        NSLog(@"#Error: %@", [error localizedDescription]);
+    }*/
+    
+    return status;
 }
 
 
@@ -500,6 +533,43 @@ char charFromMinimalChar(uint8 shortChar)
     }
     
     _data = data;
+    _bitIndex = 0;
+    
+    _state = ss_deserializing;
+    
+    return YES;
+}
+
+- (BOOL) startDeserializingWithFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error
+{
+    return [self startDeserializingWithFilePath:[url path] error:error];
+}
+
+- (BOOL) startDeserializingWithFilePath:(NSString*) path error:(NSError *__autoreleasing*) error
+{
+    if (_state == ss_error || _state == ss_serializing || _state == ss_deserializing) {
+        return NO;
+    }
+    
+    // Read file to nsdata
+    NSData *fileData = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:error];
+    
+    if (*error != nil) {
+        return NO;
+    }
+    
+    _data = [[SerializedData alloc] init];
+    
+    // Copy bytes
+    uint32 length = (uint32)[fileData length];
+    
+    const uint8 *bytes = [fileData bytes];
+    
+    [_data mallocDataBytes:length];
+    for (uint32 i = 0; i < length; i++) {
+        _data.data[i] = bytes[i];
+    }
+    
     _bitIndex = 0;
     
     _state = ss_deserializing;
@@ -574,6 +644,7 @@ char charFromMinimalChar(uint8 shortChar)
     do {
         string[i] = (char)[self getDataBits:8];
         if (_state == ss_error) {
+            free(string);
             return nil;
         }
         i++;
@@ -623,6 +694,7 @@ char charFromMinimalChar(uint8 shortChar)
         uint8 chr = [self getDataBits:6];
         
         if (_state == ss_error) {
+            free(string);
             return nil;
         }
         
@@ -683,6 +755,7 @@ char charFromMinimalChar(uint8 shortChar)
         uint8 chr = [self getDataBits:5];
         
         if (_state == ss_error) {
+            free(string);
             return nil;
         }
         

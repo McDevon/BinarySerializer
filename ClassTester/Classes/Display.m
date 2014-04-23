@@ -28,31 +28,64 @@
          sint32 value = -43765;
          [serializer addSignedData:value maxValue:600000];
          [serializer addOnes:10];*/
-        [serializer addMinimalString:@"This is ä test string öä and stuff yea"]; // ä and stuff"];
+        [serializer addCompressedString:@"This is ä test string öä and stuff yea"]; // ä and stuff"];
         
         for (int i = 0; i < 32; i++) {
             [serializer addUnsignedData:i bits:5];
         }
-            //[serializer addZeros:5];
-            //[serializer addOnes:31];
-            
-            //SerializedData *data = [serializer getData];
-            SerializedData *data = [serializer finalizeSerializing];
+        //[serializer addZeros:5];
+        //[serializer addOnes:31];
         
-        [self writeLine:[data bitString]];
+        //SerializedData *data = [serializer getData];
+        //SerializedData *data = [serializer finalizeSerializing];
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         
-        [serializer startDeserializingWith:data];
-
+        // Should find something
+        if (paths.count <= 0) {
+            break;
+        }
+        
+        NSURL *url = [NSURL URLWithString:(NSString*)[paths objectAtIndex:0]];
+        
+        url = [url URLByAppendingPathComponent:@"file.tst"];
+        
+        NSError *error = nil;
+        
+        BOOL done = [serializer finalizeSerializingToFileURL:url error:&error];
+        
+        if (error != nil) {
+            NSLog(@"#Error: %@", [error localizedDescription]);
+        }
+        
+        if (!!!done) {
+            NSLog(@"Did not write to file");
+        }
+        
+        //[self writeLine:[data bitString]];
+        
+        //[serializer startDeserializingWith:data];
+        
+        done = [serializer startDeserializingWithFileURL:url error:&error];
+        
+        if (error != nil) {
+            NSLog(@"#Error: %@", [error localizedDescription]);
+        }
+        
+        if (!!!done) {
+            NSLog(@"Did not read from file");
+        }
+        
         /*for (int i = 0; i < 32; i++) {
-            uint32 j = [serializer getUnsignedDataBits:5];
-            NSLog(@"data: %u", j);
-        }*/
+         uint32 j = [serializer getUnsignedDataBits:5];
+         NSLog(@"data: %u", j);
+         }*/
 
         /*uint32 firstVal = [serializer getUnsignedDataMaxValue:2500];
          uint32 secondVal = [serializer getUnsignedDataMaxValue:600000];
          sint32 thirdVal = [serializer getSignedDataMaxValue:600000];
          [serializer getUnsignedDataBits:10];*/
-        NSString *string = [serializer getMinimalString];
+        
+        NSString *string = [serializer getCompressedString];
         
         [self writeLine:[NSString stringWithFormat:@"Got String: %@", string]];
         
@@ -65,9 +98,9 @@
         
         //[self writeLine:[NSString stringWithFormat:@"%u", (uint8)(0xff - (pow(2, 7) - 1))]];
         
-        if (i == 99) {
+        /*if (i == 99) {
             [self writeLine:[data bitString]];
-        }
+        }*/
     }
     
     
