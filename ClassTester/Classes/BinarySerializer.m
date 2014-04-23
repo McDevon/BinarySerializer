@@ -8,6 +8,107 @@
 
 #import "BinarySerializer.h"
 
+/*
+ *  Helper functions for string compression
+ */
+
+uint8 shortChar(char character)
+{
+    uint8 value;
+    
+    // Small chars
+    if (character >= 'a' && character <= 'z') {
+        value = character - 'a';
+        return value * 2;
+    }
+    
+    // Capital chars (Capital Z is a special character)
+    if (character >= 'A' && character <= 'Y') {
+        value = character - 'A';
+        return value * 2 + 1;
+    }
+    
+    // Numbers
+    if (character >= '0' && character <= '9') {
+        value = character - '0';
+        return value + 51;
+    }
+    
+    // Space
+    if (character == ' ') {
+        return 61;
+    }
+    
+    // End of text
+    if (character == '\0') {
+        return 62;
+    }
+    
+    // Other characters
+    return 63;
+}
+
+uint8 minimalChar(char character)
+{
+    // Small letters
+    if (character >= 'a' && character <= 'z') {
+        return character - 'a';
+    }
+    
+    // Capital letters become small letters
+    if (character >= 'A' && character <= 'Z') {
+        return character - 'A';
+    }
+    
+    // .,;-?
+    // TODO: Choose which characters belong here
+    switch (character) {
+        case '.':
+            return 27;
+            break;
+            
+        case ',':
+            return 28;
+            break;
+            
+        case ';':
+            return 29;
+            break;
+            
+        case '-':
+            return 30;
+            break;
+            
+        case '\0':
+            return 31;
+            break;
+            
+        default:
+            break;
+    }
+    
+    // Space
+    return 26;
+}
+
+char charFromShortChar(uint8 shortChar)
+{
+    static char table[65] = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYz0123456789 \0*\0";
+    if (shortChar < 64) {
+        return table[shortChar];
+    }
+    return '*';
+}
+
+char charFromMinimalChar(uint8 shortChar)
+{
+    static char table[33] = "abcdefghijklmnopqrstuvwxyz .,;-\0\0";
+    if (shortChar < 32) {
+        return table[shortChar];
+    }
+    return ' ';
+}
+
 @implementation SerializedData
 {
     uint8 *_data;
@@ -246,13 +347,68 @@
     // Add to data
     size_t i = 0;
     while (i <= 0 || data[i-1] != '\0') {
-        [self addData:(uint32)data[i] bits:8];
+        if (!!![self addData:(uint32)data[i] bits:8]) {
+            return NO;
+        }
         i++;
     }
     
     //printf("%s", data);
     
-    return NO;
+    return YES;
+}
+
+- (BOOL) addCompressedString:(NSString*) string
+{
+    // Compress most characters to 6 bits, specials get extra 8 bits
+    // All characters are available to use
+    
+    // Convert to chars
+    const char *data = [[[NSString stringWithFormat:@"%@\0", string] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes];
+    
+    // Add to data
+    size_t i = 0;
+    while (i <= 0 || data[i-1] != '\0') {
+        // Get shorter char
+        uint8 chr = shortChar(data[i]);
+        if (!!![self addData:(uint32)chr bits:6]) {
+            return NO;
+        }
+        
+        // This char not in short dictionary, add full char for reference
+        if (chr == 63) {
+            if (!!![self addData:(uint32)data[i] bits:8]) {
+                return NO;
+            }
+        }
+        
+        i++;
+    }
+    
+    return YES;
+}
+
+- (BOOL) addMinimalString:(NSString*) string
+{
+    // Compress most characters to 5 bits, only a small list of characters available
+    // No numbers, capital letters, etc.
+    
+    // Convert to chars
+    const char *data = [[[NSString stringWithFormat:@"%@\0", string] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes];
+    
+    // Add to data
+    size_t i = 0;
+    while (i <= 0 || data[i-1] != '\0') {
+        // Get shorter char
+        uint8 chr = minimalChar(data[i]);
+        if (!!![self addData:(uint32)chr bits:5]) {
+            return NO;
+        }
+        
+        i++;
+    }
+    
+    return YES;
 }
 
 /*
@@ -453,6 +609,119 @@
     return str;
 }
 
+- (NSString*) getCompressedString
+{
+    // Start getting some
+    size_t t = 32;
+    size_t i = 0;
+    char *string = (char*)calloc(t, sizeof(char));
+    if (string == NULL) {
+        _state = ss_error;
+        return nil;
+    }
+    do {
+        uint8 chr = [self getDataBits:6];
+        
+        if (_state == ss_error) {
+            return nil;
+        }
+        
+        // Char was not in dictionary, use full ascii from next 8 bits
+        if (chr == 63) {
+            chr = [self getDataBits:8];
+            string[i] = (char)chr;
+        }
+        // Normally set dictionary char
+        else {
+            string[i] = charFromShortChar(chr);
+        }
+        
+        i++;
+        
+        // If string gets too short, double its size
+        if (i >= t) {
+            t *= 2;
+            // Allocate new string
+            char *newString = (char*)calloc(t, sizeof(char));
+            
+            if (newString == NULL) {
+                free(string);
+                _state = ss_error;
+                return nil;
+            }
+            
+            // Copy old data
+            for (int j = 0; j < i; j++) {
+                newString[j] = string[j];
+            }
+            
+            free(string);
+            string = NULL;
+            string = newString;
+        }
+    } while (string[i-1] != '\0');
+    
+    NSString *str = [[NSString alloc] initWithBytes:string length:i - 1 encoding:NSASCIIStringEncoding];
+    
+    free(string);
+    string = NULL;
+    
+    return str;
+}
+
+- (NSString*) getMinimalString
+{
+    // Start getting some
+    size_t t = 32;
+    size_t i = 0;
+    char *string = (char*)calloc(t, sizeof(char));
+    if (string == NULL) {
+        _state = ss_error;
+        return nil;
+    }
+    do {
+        uint8 chr = [self getDataBits:5];
+        
+        if (_state == ss_error) {
+            return nil;
+        }
+        
+        string[i] = charFromMinimalChar(chr);
+        
+        i++;
+        
+        // If string gets too short, double its size
+        if (i >= t) {
+            t *= 2;
+            // Allocate new string
+            char *newString = (char*)calloc(t, sizeof(char));
+            
+            if (newString == NULL) {
+                free(string);
+                _state = ss_error;
+                return nil;
+            }
+            
+            // Copy old data
+            for (int j = 0; j < i; j++) {
+                newString[j] = string[j];
+            }
+            
+            free(string);
+            string = NULL;
+            string = newString;
+        }
+    } while (string[i-1] != '\0');
+    
+    NSString *str = [[NSString alloc] initWithBytes:string length:i - 1 encoding:NSASCIIStringEncoding];
+    
+    free(string);
+    string = NULL;
+    
+    return str;
+}
+
+
 /*
  *  Actual getter method
  */
@@ -460,6 +729,7 @@
 - (uint32) getDataBits:(uint32) bits
 {
     if (_state != ss_deserializing) {
+        _state = ss_error;
         return 0;
     }
     
@@ -487,9 +757,9 @@
         startBit = _bitIndex % 8;
         
         // Trim to how many bits
-        trim = bits + startBit > 8 ? 0 : bits;
+        trim = bits + startBit >= 8 ? 0 : bits;
         
-        uint8 byte = _data.data[i];
+        uint8 byte = _data.data[i] >> startBit;
         
         // Trim
         if (trim > 0) {
@@ -497,7 +767,7 @@
         }
         
         // Get bits
-        value = value | (uint32)(byte >> startBit) << targetBit;
+        value = value | (uint32)(byte << targetBit);
         
         // Change counters
         int bitsAdded = MIN(bits, 8 - startBit);

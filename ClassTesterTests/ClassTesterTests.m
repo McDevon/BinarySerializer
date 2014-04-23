@@ -209,7 +209,7 @@
     if (!!![s01 isEqualToString:@"Quite a bit longer string for testing purposes."]) {
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
-
+    
     // Skip zero
     [_serializer getUnsignedDataBits:1];
     
@@ -218,7 +218,121 @@
         XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
     }
     
-    NSLog(@"%@", s01);
+    //NSLog(@"%@", s01);
+    
+    // Skip final zeros
+    [_serializer getUnsignedDataBits:5];
+    
+    // Test if done deserializing
+    if (_serializer.state != ss_doneDeserializing) {
+        XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
+    }
+}
+
+- (void) testCompressedStrings
+{
+    // Create data
+    [_serializer startSerializingWithByteCount:3];
+    
+    [_serializer addCompressedString:@"Test string 1"];
+    [_serializer addOnes:2];
+    [_serializer addCompressedString:@"Test string 2"];
+    [_serializer addCompressedString:@"Quite a bit longer string for testing purposes."];
+    [_serializer addZeros:1];
+    [_serializer addCompressedString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters öäåÖÄÅû<Z;:_2"];
+    [_serializer addZeros:5];
+    
+    SerializedData *data = [_serializer finalizeSerializing];
+    
+    // Read data
+    if (!!![_serializer startDeserializingWith:data]) {
+        XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    NSString *s01 = [_serializer getCompressedString];
+    if (!!![s01 isEqualToString:@"Test string 1"]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip ones
+    [_serializer getUnsignedDataBits:2];
+    
+    s01 = [_serializer getCompressedString];
+    if (!!![s01 isEqualToString:@"Test string 2"]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    s01 = [_serializer getCompressedString];
+    if (!!![s01 isEqualToString:@"Quite a bit longer string for testing purposes."]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip zero
+    [_serializer getUnsignedDataBits:1];
+    
+    s01 = [_serializer getCompressedString];
+    if (!!![s01 isEqualToString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters oaaOAAu<Z;:_2"]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    //NSLog(@"%@", s01);
+    
+    // Skip final zeros
+    [_serializer getUnsignedDataBits:5];
+    
+    // Test if done deserializing
+    if (_serializer.state != ss_doneDeserializing) {
+        XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
+    }
+}
+
+- (void) testMinimalStrings
+{
+    // Create data
+    [_serializer startSerializingWithByteCount:3];
+    
+    [_serializer addMinimalString:@"Test string 1"];
+    [_serializer addOnes:2];
+    [_serializer addMinimalString:@"Test string 2"];
+    [_serializer addMinimalString:@"Quite a bit longer string for testing purposes."];
+    [_serializer addZeros:1];
+    [_serializer addMinimalString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters öäåÖÄÅû<Z;:_2"];
+    [_serializer addZeros:5];
+    
+    SerializedData *data = [_serializer finalizeSerializing];
+    
+    // Read data
+    if (!!![_serializer startDeserializingWith:data]) {
+        XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    NSString *s01 = [_serializer getMinimalString];
+    if (!!![s01 isEqualToString:@"test string  "]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip ones
+    [_serializer getUnsignedDataBits:2];
+    
+    s01 = [_serializer getMinimalString];
+    if (!!![s01 isEqualToString:@"test string  "]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    s01 = [_serializer getMinimalString];
+    if (!!![s01 isEqualToString:@"quite a bit longer string for testing purposes."]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Skip zero
+    [_serializer getUnsignedDataBits:1];
+    
+    s01 = [_serializer getMinimalString];
+    //NSLog(@"%@", s01);
+    
+    if (!!![s01 isEqualToString:@"final string of testing is also quite long to test the capabilities of the string handler and special letters oaaoaau z;   "]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
     
     // Skip final zeros
     [_serializer getUnsignedDataBits:5];

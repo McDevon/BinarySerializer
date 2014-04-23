@@ -47,6 +47,8 @@ typedef enum {
 - (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
 
 - (BOOL) addStringInASCII:(NSString*) string;
+- (BOOL) addCompressedString:(NSString*) string;
+- (BOOL) addMinimalString:(NSString*) string;
 
 - (BOOL) addOnes:(int) amount;
 - (BOOL) addZeros:(int) amount;
@@ -63,6 +65,8 @@ typedef enum {
 - (sint32) getSignedDataBits:(uint32) bits;
 
 - (NSString*) getStringInASCII;
+- (NSString*) getCompressedString;
+- (NSString*) getMinimalString;
 
 
 - (SerializedData*) getData;
