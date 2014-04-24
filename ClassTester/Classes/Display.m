@@ -90,11 +90,45 @@
 -(void)awakeFromNib
 {
     for (int i = 0; i < 1; i++) {
-        BinarySerializer *serializer = [[BinarySerializer alloc] init];
+        // Serialize to a file
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+
+        // Should find something
+        if (paths.count <= 0) {
+            break;
+        }
+        NSURL *url = [NSURL URLWithString:(NSString*)[paths objectAtIndex:0]];
+        url = [url URLByAppendingPathComponent:@"file.tst"];
+        NSError *error = nil;
         
-        [serializer startSerializingWithByteCount:5];
+        BOOL done = false;
+        
+        /*
+         *  Create test objects
+         */
+        
+        TestObject *t1 = [[TestObject alloc] init];
+        TestObject *t2 = [[TestObject alloc] init];
+        
+        t1.testValue = -426;
+        t2.testValue = 33;
+        
+        t1.testBool = YES;
+        t2.testBool = NO;
+
+        /*
+         *  Initialize serializer
+         */
+        
+        BinarySerializer *serializer = [[BinarySerializer alloc] init];
         //serializer.compressAllStrings = YES;
         serializer.useMinimalStringsForDictionaries = YES;
+        
+        /*
+         *  Start serializing
+         */
+        
+        [serializer startSerializingWithByteCount:5];
         
         // 1. Add test string
         [serializer addCompressedString:@"This is ä test string öä and stuff yea"]; // ä and stuff"];
@@ -105,14 +139,6 @@
         }
         
         // 3. Create and add two test objects
-        TestObject *t1 = [[TestObject alloc] init];
-        TestObject *t2 = [[TestObject alloc] init];
-       
-        t1.testValue = -426;
-        t2.testValue = 33;
-        
-        t1.testBool = YES;
-        t2.testBool = NO;
         
         [serializer addObject:t1];
         [serializer addObject:t2];
@@ -166,21 +192,8 @@
         //SerializedData *data = [serializer getData];
         //SerializedData *data = [serializer finalizeSerializing];
         
-        // Serialize to a file
-        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
         
-        // Should find something
-        if (paths.count <= 0) {
-            break;
-        }
-        
-        NSURL *url = [NSURL URLWithString:(NSString*)[paths objectAtIndex:0]];
-        
-        url = [url URLByAppendingPathComponent:@"file.tst"];
-        
-        NSError *error = nil;
-        
-        BOOL done = [serializer finalizeSerializingToFileURL:url error:&error];
+        done = [serializer finalizeSerializingToFileURL:url error:&error];
         
         if (error != nil) {
             NSLog(@"#Error: %@", [error localizedDescription]);
@@ -189,7 +202,7 @@
         if (!!!done) {
             NSLog(@"Did not write to file");
         }
-        
+        //*/
         
         /*
          *  Read the data
@@ -286,7 +299,7 @@
         // 7. String tests
         
         NSString *testString = (NSString*)[serializer getObject];
-        [self writeLine:@"%@", testString];
+        [self writeLine:@"Test string: %@", testString];
         
         // 8. Set tests
         NSMutableSet *s2 = (NSMutableSet*)[serializer getObject];
