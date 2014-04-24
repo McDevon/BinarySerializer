@@ -25,6 +25,7 @@
     // This method is called before the invocation of each test method in the class.
     
     _serializer = [[BinarySerializer alloc] init];
+    //_serializer.forceOffsetOfNormalBytes = YES;
 }
 
 - (void) tearDown
@@ -183,7 +184,7 @@
     [_serializer addASCIIString:@"Quite a bit longer string for testing purposes."];
     [_serializer addZeros:1];
     [_serializer addASCIIString:@"Final string of testing is also quite long to test the capabilities of the string handler and special letters öäåÖÄÅû<Z;:_2"];
-    [_serializer addZeros:5];
+    //[_serializer addZeros:5];
     
     SerializedData *data = [_serializer finalizeSerializing];
     
@@ -221,7 +222,7 @@
     //NSLog(@"%@", s01);
     
     // Skip final zeros
-    [_serializer getUnsignedDataBits:5];
+    [_serializer getToNextByte];
     
     // Test if done deserializing
     if (_serializer.state != ss_doneDeserializing) {
@@ -394,6 +395,67 @@
     if (_serializer.state != ss_doneDeserializing) {
         XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
     }
+}
+
+- (void) testOffsetForcing
+{
+    // Create data
+    [_serializer startSerializingWithByteCount:3];
+    _serializer.forceOffsetOfNormalBytes = YES;
+    
+    [_serializer addFloat:3.141f];
+    
+    [_serializer addOnesToNextFullByte];
+    [_serializer addDouble:23843244.9823];
+    
+    [_serializer addOnesToNextFullByte];
+    [_serializer addOnes:2];
+    [_serializer addObject:@"Full test string with some length and lots of special characters !#€%&/()=?©@£$∞§|[]≈±ß∂–…‚"];
+
+    [_serializer addOnesToNextFullByte];
+    
+    
+    SerializedData *data = [_serializer finalizeSerializing];
+    
+    // Read data
+    if (!!![_serializer startDeserializingWith:data]) {
+        XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Float and double
+    float f01 = [_serializer getFloat];
+    if (f01 - 3.141f > 0.00001f) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Compensate for ones
+    [_serializer getToNextByte];
+    
+    double d01 = [_serializer getDouble];
+    if (d01 - 23843244.9823 > 0.0000001) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+
+    // Compensate for ones
+    [_serializer getToNextByte];
+    [_serializer getUnsignedDataBits:2];
+    
+    NSString *s01 = (NSString*)[_serializer getObject];
+    
+    NSLog(@"String: %@", s01);
+    
+    if (!!! [s01 isEqualToString:@"Full test string with some length and lots of special characters !#€%&/()=?©@£$∞§|[]≈±ß∂–…‚"]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Get trailing ones
+    [_serializer getToNextByte];
+    
+    // Test if done deserializing
+    if (_serializer.state != ss_doneDeserializing) {
+        XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
+    }
+
 }
 
 @end

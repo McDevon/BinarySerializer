@@ -228,6 +228,7 @@ char charFromMinimalChar(uint8 shortChar)
     
     BOOL _compressAllStrings;
     BOOL _useMinimalStringsForDictionaries;
+    BOOL _forceOffsetOfNormalBytes;
 }
 
 - (id) init
@@ -235,6 +236,7 @@ char charFromMinimalChar(uint8 shortChar)
     if (self = [super init]) {
         _compressAllStrings = NO;
         _useMinimalStringsForDictionaries = NO;
+        _forceOffsetOfNormalBytes = NO;
     }
     
     return self;
@@ -256,6 +258,46 @@ char charFromMinimalChar(uint8 shortChar)
     }
     
     return bits;
+}
+
+- (void) testAndAddOffset
+{
+    // Not in use, do nothing
+    if (!!! _forceOffsetOfNormalBytes) {
+        return;
+    }
+    
+    // Not in a position to need offset, do noting
+    if (_bitIndex % 8 != 0) {
+        return;
+    }
+    
+    // Randomize offset bit amount (1 or 2)
+    uint8 bitAmount = 1 + arc4random() % 2;
+    
+    // If one bit, it's 1. If two bits, they are 01
+    [self addData:bitAmount bits:bitAmount];
+}
+
+- (void) testAndGetOffset
+{
+    // Not in use, do nothing
+    if (!!! _forceOffsetOfNormalBytes) {
+        return;
+    }
+    
+    // Not in a position to need offset, do noting
+    if (_bitIndex % 8 != 0) {
+        return;
+    }
+    
+    // Read first offset bit
+    uint8 offsetBit = [self getDataBits:1];
+    
+    // If two bits there, read the second
+    if (offsetBit == 0) {
+        [self getDataBits:1];
+    }
 }
 
 #pragma mark -
@@ -367,6 +409,18 @@ char charFromMinimalChar(uint8 shortChar)
     return [self addData:value bits:amount];
 }
 
+- (BOOL) addOnesToNextFullByte
+{
+    int currentBitInByte = _bitIndex % 8;
+    
+    if (currentBitInByte == 0) {
+        return 0;
+    }
+    
+    // Get value from the remaining bits of this byte
+    return [self addOnes:8 - currentBitInByte];
+}
+
 - (BOOL) addZeros:(int) amount
 {
     int value = 0;
@@ -375,6 +429,9 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (BOOL) addFloat:(float)value
 {
+    // Optional offset
+    [self testAndAddOffset];
+    
     uint32 store = 0;
     
     // Copy bits to store
@@ -386,6 +443,9 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (BOOL) addDouble:(double)value
 {
+    // Optional offset
+    [self testAndAddOffset];
+    
     uint32 store[2] = {0, 0};
     
     // Copy bits to store
@@ -404,6 +464,9 @@ char charFromMinimalChar(uint8 shortChar)
 {
     // Convert to chars
     const char *data = [[[NSString stringWithFormat:@"%@\0", string] dataUsingEncoding:NSASCIIStringEncoding allowLossyConversion:YES] bytes];
+    
+    // Optional offset
+    [self testAndAddOffset];
     
     // Add to data
     size_t i = 0;
@@ -586,12 +649,14 @@ char charFromMinimalChar(uint8 shortChar)
             [self addCompressedString:string];
         }
         else {
+            // Optional offset
+            [self testAndAddOffset];
             
             // Add uncompressed string data byte by byte
             const char *stringData = [string cStringUsingEncoding:NSUTF8StringEncoding];
             
             // Save string data
-            uint32 length = (uint32)string.length;
+            uint32 length = (uint32)strlen(stringData);
             for (uint32 i = 0; i < length; i++) {
                 [self addData:stringData[i] bits:8];
             }
@@ -841,6 +906,9 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (NSString*) getASCIIString
 {
+    // Optional offset
+    [self testAndGetOffset];
+    
     // Start getting some
     size_t t = 32;
     size_t i = 0;
@@ -1014,6 +1082,9 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (float) getFloat
 {
+    // Optional offset
+    [self testAndGetOffset];
+    
     uint32 store = [self getDataBits:32];
     float value;
     memcpy(&value, &store, sizeof(float));
@@ -1023,6 +1094,9 @@ char charFromMinimalChar(uint8 shortChar)
 
 - (double) getDouble
 {
+    // Optional offset
+    [self testAndGetOffset];
+    
     // Get data
     uint32 store[2] = {0, 0};
     store[1] = [self getDataBits:32];
@@ -1181,6 +1255,9 @@ char charFromMinimalChar(uint8 shortChar)
         }
         else {
             // Full string saved in UTF8
+            
+            // Optional offset
+            [self testAndGetOffset];
             
             // Start getting some
             size_t t = 32;

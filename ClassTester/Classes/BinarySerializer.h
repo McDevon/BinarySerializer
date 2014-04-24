@@ -53,6 +53,7 @@ typedef enum {
 @property SerializingState state;
 @property BOOL compressAllStrings;
 @property BOOL useMinimalStringsForDictionaries;
+@property BOOL forceOffsetOfNormalBytes;
 
 /*
  *  Serializing
@@ -93,6 +94,8 @@ typedef enum {
 
 - (BOOL) addOnes:(int) amount;
 - (BOOL) addZeros:(int) amount;
+
+- (BOOL) addOnesToNextFullByte;
 
 - (SerializedData*) finalizeSerializing;
 - (BOOL) finalizeSerializingToFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error;
