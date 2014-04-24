@@ -19,6 +19,11 @@ typedef enum {
 
 @class BinarySerializer;
 
+
+/*
+ *  Interface, which must be conformed to by custom objects to be serialized
+ */
+
 @protocol BinarySerializing <NSObject>
 
 @required
@@ -47,8 +52,12 @@ typedef enum {
 
 @property SerializingState state;
 @property BOOL compressAllStrings;
+@property BOOL useMinimalStringsForDictionaries;
 
-// Serializing
+/*
+ *  Serializing
+ */
+
 - (BOOL) startSerializing;
 - (BOOL) startSerializingWithByteCount:(int) count;
 
@@ -59,6 +68,8 @@ typedef enum {
 - (BOOL) addUnsignedData:(uint32) data bits:(uint32) bits;
 
 - (BOOL) addBoolean:(BOOL) value;
+- (BOOL) addFloat:(float) value;
+- (BOOL) addDouble:(double)value;
 
 - (BOOL) addASCIIString:(NSString*) string;
 - (BOOL) addCompressedString:(NSString*) string;
@@ -77,6 +88,7 @@ typedef enum {
  *  - NSSet & NSMutableSet
  *  - NSString (mutable not available)
  */
+
 - (BOOL) addObject:(NSObject*) object;
 
 - (BOOL) addOnes:(int) amount;
@@ -86,7 +98,11 @@ typedef enum {
 - (BOOL) finalizeSerializingToFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error;
 - (BOOL) finalizeSerializingToFilePath:(NSString*) path error:(NSError *__autoreleasing*) error;
 
-// Deserializing
+
+/*
+ *  Deserializing
+ */
+
 - (BOOL) startDeserializingWith:(SerializedData*) data;
 - (BOOL) startDeserializingWithFileURL:(NSURL*) url error:(NSError *__autoreleasing*) error;
 - (BOOL) startDeserializingWithFilePath:(NSString*) path error:(NSError *__autoreleasing*) error;
@@ -98,6 +114,10 @@ typedef enum {
 - (sint32) getSignedDataBits:(uint32) bits;
 
 - (BOOL) getBoolean;
+- (float) getFloat;
+- (double) getDouble;
+
+- (uint32) getToNextByte;
 
 - (NSString*) getASCIIString;
 - (NSString*) getCompressedString;
@@ -105,7 +125,5 @@ typedef enum {
 
 - (NSObject*) getObject;
 
-// Should use finalizeSerializing instead of this (it will trim the trailing bytes)
-- (SerializedData*) getData;
 
 @end

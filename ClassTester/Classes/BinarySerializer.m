@@ -225,13 +225,16 @@ char charFromMinimalChar(uint8 shortChar)
     uint32 _bitIndex;
     
     SerializingState _state;
+    
     BOOL _compressAllStrings;
+    BOOL _useMinimalStringsForDictionaries;
 }
 
 - (id) init
 {
     if (self = [super init]) {
         _compressAllStrings = NO;
+        _useMinimalStringsForDictionaries = NO;
     }
     
     return self;
@@ -368,6 +371,29 @@ char charFromMinimalChar(uint8 shortChar)
 {
     int value = 0;
     return [self addData:value bits:amount];
+}
+
+- (BOOL) addFloat:(float)value
+{
+    uint32 store = 0;
+    
+    // Copy bits to store
+    memcpy(&store, &value, sizeof(float));
+    
+    // Add all bits
+    return [self addData:store bits:32];
+}
+
+- (BOOL) addDouble:(double)value
+{
+    uint32 store[2] = {0, 0};
+    
+    // Copy bits to store
+    memcpy(&store, &value, sizeof(double));
+    
+    // Add all bits in a very annoying order
+    BOOL firstBits = [self addData:store[1] bits:32];
+    return firstBits && [self addData:store[0] bits:32];
 }
 
 /*
@@ -511,8 +537,13 @@ char charFromMinimalChar(uint8 shortChar)
                 [self addCompressedString:@"MDSCString"];
                 
                 // Key
-                className = (NSString*) key;
-                [self addCompressedString:className];
+                NSString *keyString = (NSString*) key;
+                
+                if (_useMinimalStringsForDictionaries) {
+                    [self addMinimalString:keyString];
+                } else {
+                    [self addCompressedString:keyString];
+                }
             }
             else {
                 // If not NSString, add as object
@@ -981,6 +1012,43 @@ char charFromMinimalChar(uint8 shortChar)
     return (b == 1);
 }
 
+- (float) getFloat
+{
+    uint32 store = [self getDataBits:32];
+    float value;
+    memcpy(&value, &store, sizeof(float));
+    
+    return value;
+}
+
+- (double) getDouble
+{
+    // Get data
+    uint32 store[2] = {0, 0};
+    store[1] = [self getDataBits:32];
+    store[0] = [self getDataBits:32];
+    
+    // Copy to value
+    double value;
+    memcpy(&value, &store, sizeof(double));
+    
+    return value;
+}
+
+- (uint32) getToNextByte
+{
+    // Will get remaining bits of the current byte. If at end of byte, gets nothing.
+    
+    int currentBitInByte = _bitIndex % 8;
+    
+    if (currentBitInByte == 0) {
+        return 0;
+    }
+    
+    // Get value from the remaining bits of this byte
+    return [self getDataBits:8 - currentBitInByte];
+}
+
 /*
  *  Object handling
  */
@@ -1045,13 +1113,19 @@ char charFromMinimalChar(uint8 shortChar)
             
             // First, get key
             
-            // Special handling for NSStrings (to use shortChars)
             NSString *name = [self getCompressedString];
             NSObject<NSCopying> *key = nil;
             
+            // Special handling for NSString keys (to use shortChars)
             if ([name isEqualToString:@"MDSCString"]) {
                 // Create a string from data
-                NSString *keyData = [self getCompressedString];
+                NSString *keyData = nil;
+                
+                if (_useMinimalStringsForDictionaries) {
+                    keyData = [self getMinimalString];
+                } else {
+                    keyData = [self getCompressedString];
+                }
                 
                 // Initialize key
                 NSString *actualKey = [NSString alloc];

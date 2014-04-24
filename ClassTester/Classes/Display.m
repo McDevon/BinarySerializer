@@ -9,7 +9,7 @@
 #import "Display.h"
 #import "BinarySerializer.h"
 
-@interface TestObject : NSObject <BinarySerializing>
+@interface TestObject : NSObject <BinarySerializing, NSCopying>
 
 @property int testValue;
 @property BOOL testBool;
@@ -40,6 +40,43 @@
     return self;
 }
 
+- (id)copyWithZone:(NSZone *)zone
+{
+    TestObject *d = [[[self class] allocWithZone:zone] init];
+    d.testValue = _testValue;
+    d.testBool = _testBool;
+    NSLog(@"NSCopying used");
+    return d;
+}
+
+- (BOOL) isEqual:(id)object
+{
+    NSLog(@"isEqual used");
+    if (self == object) {
+        return YES;
+    }
+    
+    if ([object isKindOfClass:[TestObject class]]) {
+        TestObject *t = (TestObject*)object;
+        if (t.testValue == _testValue && t.testBool == _testBool) {
+            return YES;
+        }
+    }
+    
+    return NO;
+}
+
+- (NSUInteger)hash
+{
+    NSLog(@"Hash used");
+    NSUInteger prime = 31;
+    NSUInteger result = 1;
+    
+    result = prime * result + abs(_testValue);
+    
+    return result;
+}
+
 @end
 
 @interface Display ()
@@ -57,6 +94,7 @@
         
         [serializer startSerializingWithByteCount:5];
         //serializer.compressAllStrings = YES;
+        serializer.useMinimalStringsForDictionaries = YES;
         
         // 1. Add test string
         [serializer addCompressedString:@"This is ä test string öä and stuff yea"]; // ä and stuff"];
@@ -104,6 +142,7 @@
         
         [d1 setObject:t1 forKey:@"Firstkey"];
         [d1 setObject:t2 forKey:@"Second key"];
+        [d1 setObject:a1 forKey:@"Array here"];
         
         [serializer addObject:d1];
         
@@ -225,9 +264,23 @@
         NSMutableDictionary *d2 = (NSMutableDictionary*)[serializer getObject];
         
         for (NSString *key in [d2 allKeys]) {
-            TestObject *o = [d2 objectForKey:key];
+            TestObject *obj = [d2 objectForKey:key];
             
-            [self writeLine:@"Key: %@ value: %d", key, o.testValue];
+            if ([obj isKindOfClass:[TestObject class]]) {
+                TestObject *o = (TestObject*)obj;
+                [self writeLine:@"Key: %@ value: %d", key, o.testValue];
+            }
+
+            else if ([obj isKindOfClass:[NSArray class]]) {
+                NSArray *array = (NSArray*)obj;
+                
+                [self writeLine:@"Key: %@ value is an array", key];
+                
+                for (TestObject *o in array) {
+                    [self writeLine:@"Dictionary-array-data: %d", o.testValue];
+                }
+            }
+            
         }
         
         // 7. String tests
@@ -248,6 +301,21 @@
         /*if (i == 99) {
             [self writeLine:[data bitString]];
         }*/
+        
+        
+        /*
+         *  Other tests
+         */
+        
+        NSDictionary *dict = @{t1: @"Value", t2: @"AnotherValue"};
+        
+        TestObject *comp = [[TestObject alloc] init];
+        comp.testValue = -426;
+        comp.testBool = YES;
+        
+        NSString *str = [dict objectForKey:comp];
+        
+        NSLog(@"Found string: %@", str);
     }
     
     

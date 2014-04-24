@@ -103,7 +103,7 @@
     }
     
     // Get final zeros (Must finish the last byte)
-    [_serializer getUnsignedDataBits:5];
+    [_serializer getUnsignedDataBits:6];
     
     // Test if done deserializing
     if (_serializer.state != ss_doneDeserializing) {
@@ -336,6 +336,59 @@
     
     // Skip final zeros
     [_serializer getUnsignedDataBits:5];
+    
+    // Test if done deserializing
+    if (_serializer.state != ss_doneDeserializing) {
+        XCTFail(@"Deserializing did not end in \"%s\"", __PRETTY_FUNCTION__);
+    }
+}
+
+- (void) testHelpers
+{
+    // Create data
+    [_serializer startSerializingWithByteCount:3];
+    
+    [_serializer addBoolean:NO];
+    [_serializer addBoolean:YES];
+    
+    [_serializer addFloat:3.141f];
+    [_serializer addDouble:23843244.9823];
+    
+    [_serializer addOnes:6];
+    
+    
+    SerializedData *data = [_serializer finalizeSerializing];
+    
+    // Read data
+    if (!!![_serializer startDeserializingWith:data]) {
+        XCTFail(@"Deserializer did not start in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Test booleans
+    if ([_serializer getBoolean]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    if (!!![_serializer getBoolean]) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    // Float and double
+    float f01 = [_serializer getFloat];
+    if (f01 - 3.141f > 0.00001f) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    double d01 = [_serializer getDouble];
+    if (d01 - 23843244.9823 > 0.0000001) {
+        XCTFail(@"Failed data read with deserializer in \"%s\"", __PRETTY_FUNCTION__);
+    }
+    
+    
+    // Get trailing ones
+    [_serializer getToNextByte];
+    
+    // Test that this method does not jump forward
+    [_serializer getToNextByte];
     
     // Test if done deserializing
     if (_serializer.state != ss_doneDeserializing) {
