@@ -348,6 +348,7 @@ char charFromMinimalChar(uint8 shortChar)
     if (value > edgeValue)
     {
         // Trying to set a value which does not fit in the given amount of bits
+        [self addOnes:bits];
         return NO;
     }
     
@@ -361,6 +362,7 @@ char charFromMinimalChar(uint8 shortChar)
     if (value > edgeValue)
     {
         // Trying to set a value which does not fit in the given amount of bits
+        [self addOnes:bits];
         return NO;
     }
     
@@ -387,6 +389,7 @@ char charFromMinimalChar(uint8 shortChar)
     // Sanity check
     sint32 edgeValue = bits >= 32 ? 0x7fffffff : pow(2, bits - 1) - 1;
     if (value >= edgeValue || value < -edgeValue) {
+        [self addOnes:bits];
         return NO;
     }
     
